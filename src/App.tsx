@@ -173,6 +173,20 @@ export const App: React.FC = () => {
       });
   }
 
+  const allCompleted = todos.length > 0 && todos.every(todo => todo.completed);
+
+  function handleToggleAll() {
+    setErrorMessage(ErrorMessages.None);
+
+    const shouldCompleteAll = !allCompleted;
+
+    todos.forEach(todo => {
+      if (todo.completed !== shouldCompleteAll) {
+        handleToggleTodo(todo);
+      }
+    });
+  }
+
   const filteredTodos = getFilteredTodos(todos, selectedFilter);
 
   const notCompletedCount = useMemo(
@@ -188,14 +202,15 @@ export const App: React.FC = () => {
 
       <div className="todoapp__content">
         <header className="todoapp__header">
-          {/* this button should have `active` class only if all todos are completed */}
           <button
-            type="button"
-            className="todoapp__toggle-all active"
             data-cy="ToggleAllButton"
+            type="button"
+            className={classNames('todoapp__toggle-all', {
+              active: allCompleted,
+            })}
+            onClick={handleToggleAll}
           />
 
-          {/* Add a todo on form submit */}
           <form onSubmit={handleAddTodo}>
             <input
               ref={newTodoFieldRef}
@@ -231,8 +246,6 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* DON'T use conditional rendering to hide the notification */}
-      {/* Add the 'hidden' class to hide the message smoothly */}
       <div
         data-cy="ErrorNotification"
         className={classNames(
@@ -247,9 +260,6 @@ export const App: React.FC = () => {
           onClick={() => setErrorMessage(ErrorMessages.None)}
         />
         {errorMessage}
-        {/* show only one message at a time */}
-        {/*
-        Unable to update a todo */}
       </div>
     </div>
   );
