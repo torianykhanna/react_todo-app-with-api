@@ -21,6 +21,7 @@ export const App: React.FC = () => {
   const newTodoFieldRef = useRef<HTMLInputElement>(null);
   const [deletingTodoId, setDeletingTodoId] = useState<number | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<Filter>(Filter.All);
+  const [updatingTodoId, setUpdatingTodoId] = useState<number | null>(null);
 
   const showError = (message: ErrorMessages) => {
     setErrorMessage(message);
@@ -49,10 +50,10 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && deletingTodoId === null) {
+    if (!isLoading && deletingTodoId === null && updatingTodoId === null) {
       newTodoFieldRef.current?.focus();
     }
-  }, [isLoading, deletingTodoId]);
+  }, [isLoading, deletingTodoId, updatingTodoId]);
 
   function handleFilterChange(event: React.MouseEvent, newFilterState: Filter) {
     event.preventDefault();
@@ -151,6 +152,27 @@ export const App: React.FC = () => {
     });
   }
 
+  function handleToggleTodo(todo: Todo) {
+    setErrorMessage(ErrorMessages.None);
+    setUpdatingTodoId(todo.id);
+
+    todoService
+      .updateTodo(todo.id, { completed: !todo.completed })
+      .then(updatedTodo => {
+        setTodos(prev =>
+          prev.map(currentTodo =>
+            currentTodo.id === todo.id ? updatedTodo : currentTodo,
+          ),
+        );
+      })
+      .catch(() => {
+        showError(ErrorMessages.UpdateTodo);
+      })
+      .finally(() => {
+        setUpdatingTodoId(null);
+      });
+  }
+
   const filteredTodos = getFilteredTodos(todos, selectedFilter);
 
   const notCompletedCount = useMemo(
@@ -192,8 +214,10 @@ export const App: React.FC = () => {
         <TodoList
           todos={filteredTodos}
           deletingTodoId={deletingTodoId}
+          updatingTodoId={updatingTodoId}
           tempTodo={tempTodo}
           onDelete={handleDeleteTodo}
+          onToggle={handleToggleTodo}
         />
 
         {todos.length > 0 && (

@@ -8,12 +8,14 @@ type Props = {
   todo: Todo;
   isLoading?: boolean;
   onDelete?: () => void;
+  onToggle: () => void;
 };
 
 export const TodoItem: React.FC<Props> = ({
   todo: { completed, title },
   isLoading = false,
   onDelete,
+  onToggle,
 }) => {
   return (
     <div
@@ -26,6 +28,8 @@ export const TodoItem: React.FC<Props> = ({
           type="checkbox"
           className="todo__status"
           checked={completed}
+          onChange={onToggle}
+          disabled={isLoading}
         />
       </label>
 
