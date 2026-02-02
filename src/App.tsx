@@ -2,12 +2,13 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as todoService from './api/todos';
-import { TodoItem } from './components/TodoItem/TodoItem';
 import { Todo } from './types/Todo';
 import classNames from 'classnames';
-import { filterTodos } from './filtersTodos';
 import { Filter } from './types/Filter';
 import { ErrorMessages } from './types/ErrorMessages';
+import { getFilteredTodos } from './utils/getFilteredTodos';
+import { TodoList } from './components/TodoList/TodoList';
+import { TodoFooter } from './components/TodoFooter/TodoFooter';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -15,21 +16,29 @@ export const App: React.FC = () => {
     ErrorMessages.None,
   );
   const [newTitle, setNewTitle] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const newTodoFieldRef = useRef<HTMLInputElement>(null);
   const [deletingTodoId, setDeletingTodoId] = useState<number | null>(null);
-  const [isClearingCompleted, setIsClearingCompleted] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<Filter>(Filter.All);
 
-  const errorTimerId = useRef(0);
   const showError = (message: ErrorMessages) => {
     setErrorMessage(message);
-    window.clearTimeout(errorTimerId.current);
-    errorTimerId.current = window.setTimeout(() => {
+  };
+
+  useEffect(() => {
+    if (errorMessage === ErrorMessages.None) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
       setErrorMessage(ErrorMessages.None);
     }, 3000);
-  };
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [errorMessage]);
 
   useEffect(() => {
     setErrorMessage(ErrorMessages.None);
@@ -40,14 +49,10 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdding && deletingTodoId === null && !isClearingCompleted) {
+    if (!isLoading && deletingTodoId === null) {
       newTodoFieldRef.current?.focus();
     }
-  }, [isAdding, deletingTodoId, isClearingCompleted]);
-
-  function handleHideError() {
-    setErrorMessage(ErrorMessages.None);
-  }
+  }, [isLoading, deletingTodoId]);
 
   function handleFilterChange(event: React.MouseEvent, newFilterState: Filter) {
     event.preventDefault();
@@ -67,7 +72,7 @@ export const App: React.FC = () => {
     }
 
     setErrorMessage(ErrorMessages.None);
-    setIsAdding(true);
+    setIsLoading(true);
 
     const newTempTodo: Todo = {
       id: 0,
@@ -90,7 +95,7 @@ export const App: React.FC = () => {
         setTempTodo(null);
       })
       .finally(() => {
-        setIsAdding(false);
+        setIsLoading(false);
       });
   }
 
@@ -113,7 +118,6 @@ export const App: React.FC = () => {
 
   function handleClearCompleted() {
     setErrorMessage(ErrorMessages.None);
-    setIsClearingCompleted(true);
 
     const completedTodos = todos.filter(todo => todo.completed);
 
@@ -122,7 +126,7 @@ export const App: React.FC = () => {
     );
 
     Promise.allSettled(requests).then(results => {
-      const hasError = results.some(r => r.status === 'rejected');
+      const hasError = results.some(reject => reject.status === 'rejected');
 
       setTodos(prev =>
         prev.filter(
@@ -131,7 +135,9 @@ export const App: React.FC = () => {
               completedTodo =>
                 completedTodo.id === todo.id &&
                 results[
-                  completedTodos.findIndex(t => t.id === completedTodo.id)
+                  completedTodos.findIndex(
+                    completed => completed.id === completedTodo.id,
+                  )
                 ].status === 'fulfilled',
             ),
         ),
@@ -141,11 +147,11 @@ export const App: React.FC = () => {
         showError(ErrorMessages.DeleteTodo);
       }
 
-      setIsClearingCompleted(false);
+      newTodoFieldRef.current?.focus();
     });
   }
 
-  const filteredTodos = filterTodos(selectedFilter, todos);
+  const filteredTodos = getFilteredTodos(todos, selectedFilter);
 
   const notCompletedCount = useMemo(
     () => todos.filter(todo => !todo.completed).length,
@@ -178,78 +184,26 @@ export const App: React.FC = () => {
               value={newTitle}
               onChange={event => setNewTitle(event.target.value)}
               autoFocus
-              disabled={isAdding}
+              disabled={isLoading}
             />
           </form>
         </header>
 
-        {todos.length > 0 && (
-          <section className="todoapp__main" data-cy="TodoList">
-            {filteredTodos.map(todo => (
-              <TodoItem
-                key={todo.id}
-                todo={todo}
-                isLoading={deletingTodoId === todo.id}
-                onDelete={() => handleDeleteTodo(todo.id)}
-              />
-            ))}
-
-            {tempTodo && <TodoItem todo={tempTodo} isLoading />}
-          </section>
-        )}
+        <TodoList
+          todos={filteredTodos}
+          deletingTodoId={deletingTodoId}
+          tempTodo={tempTodo}
+          onDelete={handleDeleteTodo}
+        />
 
         {todos.length > 0 && (
-          <footer className="todoapp__footer" data-cy="Footer">
-            <span className="todo-count" data-cy="TodosCounter">
-              {notCompletedCount} items left
-            </span>
-
-            <nav className="filter" data-cy="Filter">
-              <a
-                href="#/"
-                className={classNames('filter__link', {
-                  selected: selectedFilter === Filter.All,
-                })}
-                data-cy="FilterLinkAll"
-                onClick={event => handleFilterChange(event, Filter.All)}
-              >
-                All
-              </a>
-
-              <a
-                href="#/active"
-                className={classNames('filter__link', {
-                  selected: selectedFilter === Filter.Active,
-                })}
-                data-cy="FilterLinkActive"
-                onClick={event => handleFilterChange(event, Filter.Active)}
-              >
-                Active
-              </a>
-
-              <a
-                href="#/completed"
-                className={classNames('filter__link', {
-                  selected: selectedFilter === Filter.Completed,
-                })}
-                data-cy="FilterLinkCompleted"
-                onClick={event => handleFilterChange(event, Filter.Completed)}
-              >
-                Completed
-              </a>
-            </nav>
-
-            {/* this button should be disabled if there are no completed todos */}
-            <button
-              type="button"
-              className="todoapp__clear-completed"
-              data-cy="ClearCompletedButton"
-              disabled={!hasCompletedTodos}
-              onClick={handleClearCompleted}
-            >
-              Clear completed
-            </button>
-          </footer>
+          <TodoFooter
+            notCompletedCount={notCompletedCount}
+            hasCompletedTodos={hasCompletedTodos}
+            selectedFilter={selectedFilter}
+            onFilterChange={handleFilterChange}
+            onClearCompleted={handleClearCompleted}
+          />
         )}
       </div>
 
@@ -259,14 +213,14 @@ export const App: React.FC = () => {
         data-cy="ErrorNotification"
         className={classNames(
           'notification is-danger is-light has-text-weight-normal',
-          { hidden: errorMessage === '' },
+          { hidden: errorMessage === ErrorMessages.None },
         )}
       >
         <button
           data-cy="HideErrorButton"
           type="button"
           className="delete"
-          onClick={() => handleHideError()}
+          onClick={() => setErrorMessage(ErrorMessages.None)}
         />
         {errorMessage}
         {/* show only one message at a time */}
