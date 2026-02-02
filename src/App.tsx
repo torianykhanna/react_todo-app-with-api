@@ -9,6 +9,7 @@ import { ErrorMessages } from './types/ErrorMessages';
 import { getFilteredTodos } from './utils/getFilteredTodos';
 import { TodoList } from './components/TodoList/TodoList';
 import { TodoFooter } from './components/TodoFooter/TodoFooter';
+import { TodoHeader } from './components/TodoHeader/TodoHeader';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -173,7 +174,30 @@ export const App: React.FC = () => {
       });
   }
 
-  const allCompleted = todos.length > 0 && todos.every(todo => todo.completed);
+  function handleUpdateTodo(todo: Todo, title: string) {
+    setErrorMessage(ErrorMessages.None);
+    setUpdatingTodoId(todo.id);
+
+    todoService
+      .updateTodo(todo.id, { title })
+      .then(updatedTodo => {
+        setTodos(prev =>
+          prev.map(currentTodo =>
+            currentTodo.id === todo.id ? updatedTodo : currentTodo,
+          ),
+        );
+      })
+      .catch(() => {
+        showError(ErrorMessages.UpdateTodo);
+      })
+      .finally(() => {
+        setUpdatingTodoId(null);
+      });
+  }
+
+  const hasTodos = todos.length > 0;
+
+  const allCompleted = hasTodos && todos.every(todo => todo.completed);
 
   function handleToggleAll() {
     setErrorMessage(ErrorMessages.None);
@@ -201,30 +225,16 @@ export const App: React.FC = () => {
       <h1 className="todoapp__title">todos</h1>
 
       <div className="todoapp__content">
-        <header className="todoapp__header">
-          <button
-            data-cy="ToggleAllButton"
-            type="button"
-            className={classNames('todoapp__toggle-all', {
-              active: allCompleted,
-            })}
-            onClick={handleToggleAll}
-          />
-
-          <form onSubmit={handleAddTodo}>
-            <input
-              ref={newTodoFieldRef}
-              data-cy="NewTodoField"
-              type="text"
-              className="todoapp__new-todo"
-              placeholder="What needs to be done?"
-              value={newTitle}
-              onChange={event => setNewTitle(event.target.value)}
-              autoFocus
-              disabled={isLoading}
-            />
-          </form>
-        </header>
+        <TodoHeader
+          hasTodos={hasTodos}
+          allCompleted={allCompleted}
+          isLoading={isLoading}
+          newTitle={newTitle}
+          inputRef={newTodoFieldRef}
+          onTitleChange={setNewTitle}
+          onAddTodo={handleAddTodo}
+          onToggleAll={handleToggleAll}
+        />
 
         <TodoList
           todos={filteredTodos}
@@ -233,6 +243,7 @@ export const App: React.FC = () => {
           tempTodo={tempTodo}
           onDelete={handleDeleteTodo}
           onToggle={handleToggleTodo}
+          onUpdate={handleUpdateTodo}
         />
 
         {todos.length > 0 && (

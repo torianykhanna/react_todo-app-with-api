@@ -9,6 +9,7 @@ type Props = {
   tempTodo: Todo | null;
   onDelete: (todoId: number) => void;
   onToggle: (todo: Todo) => void;
+  onUpdate: (todo: Todo, title: string) => void;
 };
 
 export const TodoList: React.FC<Props> = ({
@@ -18,6 +19,7 @@ export const TodoList: React.FC<Props> = ({
   tempTodo,
   onDelete,
   onToggle,
+  onUpdate,
 }) => {
   if (todos.length === 0 && !tempTodo) {
     return null;
@@ -32,10 +34,19 @@ export const TodoList: React.FC<Props> = ({
           isLoading={deletingTodoId === todo.id || updatingTodoId === todo.id}
           onDelete={() => onDelete(todo.id)}
           onToggle={() => onToggle(todo)}
+          onUpdate={title => onUpdate(todo, title)}
         />
       ))}
 
-      {tempTodo && <TodoItem todo={tempTodo} isLoading onToggle={() => {}} />}
+      {tempTodo && (
+        <TodoItem
+          todo={tempTodo}
+          isLoading
+          onDelete={() => onDelete(tempTodo.id)}
+          onToggle={() => {}}
+          onUpdate={() => {}}
+        />
+      )}
     </section>
   );
 };
