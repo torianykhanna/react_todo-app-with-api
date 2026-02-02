@@ -195,20 +195,28 @@ export const App: React.FC = () => {
       });
   }
 
-  const hasTodos = todos.length > 0;
+  const hasTodos = useMemo(() => todos.length > 0, [todos]);
 
-  const allCompleted = hasTodos && todos.every(todo => todo.completed);
+  const hasCompletedTodos = useMemo(
+    () => todos.some(todo => todo.completed),
+    [todos],
+  );
+
+  const allCompleted = useMemo(
+    () => hasTodos && todos.every(todo => todo.completed),
+    [todos, hasTodos],
+  );
 
   function handleToggleAll() {
     setErrorMessage(ErrorMessages.None);
 
     const shouldCompleteAll = !allCompleted;
 
-    todos.forEach(todo => {
-      if (todo.completed !== shouldCompleteAll) {
-        handleToggleTodo(todo);
-      }
-    });
+    const todosToUpdate = todos.filter(
+      todo => todo.completed !== shouldCompleteAll,
+    );
+
+    todosToUpdate.forEach(handleToggleTodo);
   }
 
   const filteredTodos = getFilteredTodos(todos, selectedFilter);
@@ -217,8 +225,6 @@ export const App: React.FC = () => {
     () => todos.filter(todo => !todo.completed).length,
     [todos],
   );
-
-  const hasCompletedTodos = todos.some(todo => todo.completed);
 
   return (
     <div className="todoapp">
