@@ -3,13 +3,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as todoService from './api/todos';
 import { Todo } from './types/Todo';
-import classNames from 'classnames';
 import { Filter } from './types/Filter';
 import { ErrorMessages } from './types/ErrorMessages';
 import { getFilteredTodos } from './utils/getFilteredTodos';
 import { TodoList } from './components/TodoList/TodoList';
 import { TodoFooter } from './components/TodoFooter/TodoFooter';
 import { TodoHeader } from './components/TodoHeader/TodoHeader';
+import { ErrorMessage } from './components/ErrorMessage/ErrorMessage';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -20,49 +20,36 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const newTodoFieldRef = useRef<HTMLInputElement>(null);
-  const [deletingTodoId, setDeletingTodoId] = useState<number | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<Filter>(Filter.All);
-  const [updatingTodoId, setUpdatingTodoId] = useState<number | null>(null);
+  const [updatingTodoId, setUpdatingTodoId] = useState<number[]>([]);
 
   const showError = (message: ErrorMessages) => {
     setErrorMessage(message);
   };
 
   useEffect(() => {
-    if (errorMessage === ErrorMessages.None) {
-      return;
-    }
-
-    const timerId = window.setTimeout(() => {
-      setErrorMessage(ErrorMessages.None);
-    }, 3000);
-
-    return () => {
-      window.clearTimeout(timerId);
-    };
-  }, [errorMessage]);
-
-  useEffect(() => {
-    setErrorMessage(ErrorMessages.None);
     todoService
       .getTodos()
       .then(setTodos)
-      .catch(() => showError(ErrorMessages.LoadTodos));
+      .catch(() => setErrorMessage(ErrorMessages.LoadTodos));
   }, []);
 
   useEffect(() => {
-    if (!isLoading && deletingTodoId === null && updatingTodoId === null) {
+    if (!isLoading && updatingTodoId.length === 0) {
       newTodoFieldRef.current?.focus();
     }
-  }, [isLoading, deletingTodoId, updatingTodoId]);
+  }, [isLoading, updatingTodoId]);
 
-  function handleFilterChange(event: React.MouseEvent, newFilterState: Filter) {
+  const handleFilterChange = (
+    event: React.MouseEvent,
+    newFilterState: Filter,
+  ) => {
     event.preventDefault();
 
     setSelectedFilter(newFilterState);
-  }
+  };
 
-  function handleAddTodo(event: React.FormEvent<HTMLFormElement>) {
+  const handleAddTodo = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedTitle = newTitle.trim();
@@ -99,11 +86,11 @@ export const App: React.FC = () => {
       .finally(() => {
         setIsLoading(false);
       });
-  }
+  };
 
-  function handleDeleteTodo(todoId: number) {
+  const handleDeleteTodo = (todoId: number) => {
     setErrorMessage(ErrorMessages.None);
-    setDeletingTodoId(todoId);
+    setUpdatingTodoId(prev => [...prev, todoId]);
 
     todoService
       .deleteTodo(todoId)
@@ -114,11 +101,11 @@ export const App: React.FC = () => {
         showError(ErrorMessages.DeleteTodo);
       })
       .finally(() => {
-        setDeletingTodoId(null);
+        setUpdatingTodoId(prev => prev.filter(id => id !== todoId));
       });
-  }
+  };
 
-  function handleClearCompleted() {
+  const handleClearCompleted = () => {
     setErrorMessage(ErrorMessages.None);
 
     const completedTodos = todos.filter(todo => todo.completed);
@@ -151,11 +138,11 @@ export const App: React.FC = () => {
 
       newTodoFieldRef.current?.focus();
     });
-  }
+  };
 
-  function handleToggleTodo(todo: Todo) {
+  const handleToggleTodo = (todo: Todo) => {
     setErrorMessage(ErrorMessages.None);
-    setUpdatingTodoId(todo.id);
+    setUpdatingTodoId(prev => [...prev, todo.id]);
 
     todoService
       .updateTodo(todo.id, { completed: !todo.completed })
@@ -170,13 +157,13 @@ export const App: React.FC = () => {
         showError(ErrorMessages.UpdateTodo);
       })
       .finally(() => {
-        setUpdatingTodoId(null);
+        setUpdatingTodoId(prev => prev.filter(id => id !== todo.id));
       });
-  }
+  };
 
-  function handleUpdateTodo(todo: Todo, title: string) {
+  const handleUpdateTodo = (todo: Todo, title: string) => {
     setErrorMessage(ErrorMessages.None);
-    setUpdatingTodoId(todo.id);
+    setUpdatingTodoId(prev => [...prev, todo.id]);
 
     todoService
       .updateTodo(todo.id, { title })
@@ -191,9 +178,9 @@ export const App: React.FC = () => {
         showError(ErrorMessages.UpdateTodo);
       })
       .finally(() => {
-        setUpdatingTodoId(null);
+        setUpdatingTodoId(prev => prev.filter(id => id !== todo.id));
       });
-  }
+  };
 
   const hasTodos = useMemo(() => todos.length > 0, [todos]);
 
@@ -207,7 +194,7 @@ export const App: React.FC = () => {
     [todos, hasTodos],
   );
 
-  function handleToggleAll() {
+  const handleToggleAll = () => {
     setErrorMessage(ErrorMessages.None);
 
     const shouldCompleteAll = !allCompleted;
@@ -217,7 +204,7 @@ export const App: React.FC = () => {
     );
 
     todosToUpdate.forEach(handleToggleTodo);
-  }
+  };
 
   const filteredTodos = getFilteredTodos(todos, selectedFilter);
 
@@ -244,7 +231,6 @@ export const App: React.FC = () => {
 
         <TodoList
           todos={filteredTodos}
-          deletingTodoId={deletingTodoId}
           updatingTodoId={updatingTodoId}
           tempTodo={tempTodo}
           onDelete={handleDeleteTodo}
@@ -252,7 +238,7 @@ export const App: React.FC = () => {
           onUpdate={handleUpdateTodo}
         />
 
-        {todos.length > 0 && (
+        {hasTodos && (
           <TodoFooter
             notCompletedCount={notCompletedCount}
             hasCompletedTodos={hasCompletedTodos}
@@ -263,21 +249,10 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      <div
-        data-cy="ErrorNotification"
-        className={classNames(
-          'notification is-danger is-light has-text-weight-normal',
-          { hidden: errorMessage === ErrorMessages.None },
-        )}
-      >
-        <button
-          data-cy="HideErrorButton"
-          type="button"
-          className="delete"
-          onClick={() => setErrorMessage(ErrorMessages.None)}
-        />
-        {errorMessage}
-      </div>
+      <ErrorMessage
+        message={errorMessage}
+        onClose={() => setErrorMessage(ErrorMessages.None)}
+      />
     </div>
   );
 };

@@ -4,8 +4,7 @@ import { TodoItem } from '../TodoItem/TodoItem';
 
 type Props = {
   todos: Todo[];
-  deletingTodoId: number | null;
-  updatingTodoId: number | null;
+  updatingTodoId: number[];
   tempTodo: Todo | null;
   onDelete: (todoId: number) => void;
   onToggle: (todo: Todo) => void;
@@ -14,7 +13,6 @@ type Props = {
 
 export const TodoList: React.FC<Props> = ({
   todos,
-  deletingTodoId,
   updatingTodoId,
   tempTodo,
   onDelete,
@@ -31,7 +29,7 @@ export const TodoList: React.FC<Props> = ({
         <TodoItem
           key={todo.id}
           todo={todo}
-          isLoading={deletingTodoId === todo.id || updatingTodoId === todo.id}
+          isLoading={updatingTodoId.includes(todo.id)}
           onDelete={() => onDelete(todo.id)}
           onToggle={() => onToggle(todo)}
           onUpdate={title => onUpdate(todo, title)}

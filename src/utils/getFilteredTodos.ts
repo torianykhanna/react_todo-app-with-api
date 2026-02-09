@@ -9,6 +9,7 @@ export function getFilteredTodos(todos: Todo[], filter: Filter): Todo[] {
     case Filter.Completed:
       return todos.filter(todo => todo.completed);
 
+    case Filter.All:
     default:
       return todos;
   }
